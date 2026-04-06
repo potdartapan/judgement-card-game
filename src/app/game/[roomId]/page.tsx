@@ -42,12 +42,12 @@ export default function GamePage() {
           </ul>
           <button
             onClick={startGame}
-            disabled={players.length < 2}
+            disabled={players.length < 1}
             className="w-full bg-green-600 text-white font-semibold py-2 rounded-lg disabled:opacity-40"
           >
             Start Game
           </button>
-          <p className="text-xs text-gray-400 mt-2 text-center">Need at least 2 players</p>
+          <p className="text-xs text-gray-400 mt-2 text-center">Need at least 1 player</p>
         </div>
       </main>
     )

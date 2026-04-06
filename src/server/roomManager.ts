@@ -36,7 +36,7 @@ export function startGame(roomId: string): GameState | string {
   if (!room) return 'Room not found'
 
   const playerIds = Object.keys(room.playerNames)
-  if (playerIds.length < 2) return 'Need at least 2 players to start'
+  if (playerIds.length < 1) return 'Need at least 1 player to start'
   if (playerIds.length > 6) return 'Maximum 6 players allowed'
 
   const players: Player[] = playerIds.map(id => ({

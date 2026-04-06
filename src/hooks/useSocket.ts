@@ -13,7 +13,7 @@ export function useSocket(): AppSocket {
 
   if (!ref.current) {
     if (!socket) {
-      socket = io({ path: '/api/socket' })
+      socket = io()
     }
     ref.current = socket
   }
