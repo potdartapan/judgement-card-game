@@ -2,12 +2,30 @@ import { Card, Rank, Suit } from '@/shared/types'
 
 const SUITS: Suit[] = ['spades', 'hearts', 'diamonds', 'clubs']
 const RANKS: Rank[] = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A']
+// Highest first for building limited decks
+const RANKS_DESC: Rank[] = [...RANKS].reverse()
 
 export function buildDeck(): Card[] {
   const deck: Card[] = []
   for (const suit of SUITS) {
     for (const rank of RANKS) {
       deck.push({ suit, rank })
+    }
+  }
+  return deck
+}
+
+/**
+ * Build a deck with only the exact number of cards needed, taking
+ * from the highest ranks first (A, K, Q, ...).
+ * E.g. 4 players × 3 cards = 12 cards → all 4 suits of A, K, Q.
+ */
+export function buildLimitedDeck(totalCards: number): Card[] {
+  const deck: Card[] = []
+  for (const rank of RANKS_DESC) {
+    for (const suit of SUITS) {
+      deck.push({ suit, rank })
+      if (deck.length >= totalCards) return deck
     }
   }
   return deck

@@ -5,7 +5,7 @@ const HIT_BONUS = 10
 /**
  * Calculates scores for the just-completed round.
  * Hit (bid === tricksWon): +10 + bid points
- * Miss: -(difference between bid and tricksWon)
+ * Miss: 0 points
  */
 export function calculateRoundScores(state: GameState): RoundScore {
   const scores: RoundScore = {}
@@ -17,7 +17,7 @@ export function calculateRoundScores(state: GameState): RoundScore {
     if (bid === won) {
       scores[player.id] = HIT_BONUS + bid
     } else {
-      scores[player.id] = -(Math.abs(bid - won))
+      scores[player.id] = 0
     }
   }
 

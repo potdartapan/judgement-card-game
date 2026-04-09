@@ -3,6 +3,7 @@ import { ClientToServerEvents, ServerToClientEvents } from '@/shared/types'
 import {
   addPlayerToRoom,
   getRoom,
+  getPlayerIdForSocket,
   removePlayerFromRoom,
   startGame,
   updateGameState,
@@ -15,14 +16,18 @@ export function registerSocketHandlers(io: Server): void {
   io.on('connection', (socket: AppSocket) => {
     console.log(`Socket connected: ${socket.id}`)
 
-    socket.on('joinRoom', (roomId, playerName) => {
+    socket.on('joinRoom', (roomId, playerName, playerId) => {
       socket.join(roomId)
-      const room = addPlayerToRoom(roomId, socket.id, playerName)
+      const room = addPlayerToRoom(roomId, socket.id, playerId, playerName)
       io.to(roomId).emit('roomUpdated', room)
+      // If game is in progress, send current state so reconnecting player catches up
+      if (room.gameState) {
+        socket.emit('gameStateUpdated', room.gameState)
+      }
     })
 
-    socket.on('startGame', (roomId) => {
-      const result = startGame(roomId)
+    socket.on('startGame', (roomId, maxCards) => {
+      const result = startGame(roomId, maxCards)
       if (typeof result === 'string') {
         socket.emit('error', result)
         return
@@ -36,7 +41,10 @@ export function registerSocketHandlers(io: Server): void {
       const room = getRoom(roomId)
       if (!room?.gameState) { socket.emit('error', 'Game not started'); return }
 
-      const result = applyBid(room.gameState, socket.id, bid)
+      const playerId = getPlayerIdForSocket(roomId, socket.id)
+      if (!playerId) { socket.emit('error', 'Player not found'); return }
+
+      const result = applyBid(room.gameState, playerId, bid)
       if (typeof result === 'string') { socket.emit('error', result); return }
 
       updateGameState(roomId, result)
@@ -47,13 +55,16 @@ export function registerSocketHandlers(io: Server): void {
       const room = getRoom(roomId)
       if (!room?.gameState) { socket.emit('error', 'Game not started'); return }
 
-      const result = applyPlayCard(room.gameState, socket.id, card)
+      const playerId = getPlayerIdForSocket(roomId, socket.id)
+      if (!playerId) { socket.emit('error', 'Player not found'); return }
+
+      const result = applyPlayCard(room.gameState, playerId, card)
       if (typeof result === 'string') { socket.emit('error', result); return }
 
       updateGameState(roomId, result)
       io.to(roomId).emit('gameStateUpdated', result)
 
-      // Auto-advance round after a short delay so clients can show round-end screen
+      // Auto-advance round after a delay so clients can see the last trick and scores
       if (result.phase === 'roundEnd') {
         setTimeout(() => {
           const r = getRoom(roomId)
@@ -61,13 +72,12 @@ export function registerSocketHandlers(io: Server): void {
           const next = advanceRound(r.gameState)
           updateGameState(roomId, next)
           io.to(roomId).emit('gameStateUpdated', next)
-        }, 3000)
+        }, 5000)
       }
     })
 
     socket.on('disconnect', () => {
       console.log(`Socket disconnected: ${socket.id}`)
-      // Remove from any rooms they were in
       for (const roomId of socket.rooms) {
         if (roomId === socket.id) continue
         removePlayerFromRoom(roomId, socket.id)

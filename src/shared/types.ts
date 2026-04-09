@@ -44,10 +44,13 @@ export interface GameState {
   round: number          // current round number (1-indexed)
   maxRounds: number      // total rounds in the game
   cardsThisRound: number // how many cards are dealt this round
+  maxCardsPerRound: number // the starting (max) card count chosen at game start
+  gameDeck: Card[]        // fixed pool of cards for the entire game
   trump: Suit | null
   phase: GamePhase
   currentPlayerIndex: number   // whose turn it is
   currentTrick: Trick
+  lastCompletedTrick: Trick | null  // shown briefly before clearing
   completedTricks: Trick[]
   scores: RoundScore[]   // one entry per completed round
   dealerIndex: number
@@ -58,7 +61,8 @@ export interface GameState {
 export interface Room {
   id: string
   gameState: GameState | null
-  playerNames: Record<string, string>  // socketId -> name
+  playerNames: Record<string, string>  // playerId -> name
+  socketToPlayer: Record<string, string>  // socketId -> playerId
 }
 
 // ─── Socket Events ───────────────────────────────────────────────────────────
@@ -70,8 +74,8 @@ export interface ServerToClientEvents {
 }
 
 export interface ClientToServerEvents {
-  joinRoom: (roomId: string, playerName: string) => void
-  startGame: (roomId: string) => void
+  joinRoom: (roomId: string, playerName: string, playerId: string) => void
+  startGame: (roomId: string, maxCards?: number) => void
   placeBid: (roomId: string, bid: number) => void
   playCard: (roomId: string, card: Card) => void
 }

@@ -1,0 +1,11 @@
+1) Fix scoring- if you bid x tricks and you win x tricks, you should get 10+x points. If you do not get x tricks, you should get 0 points
+2) Highlight when it is your turn
+3) Error should not cause game to exit
+4) If someone refreshes the window, the game should continue
+5) At the start of the game, ask how many rounds you want to play. Start the game with that number of cards, decreasing the ammount each turn
+   and increasing again till the same number
+6) When all players have played there cards, the next round starts immediately and the players don't see the card played
+   by the last person. 
+   All the played cards should be shown for n seconds before starting the next round. 
+   This is important as otherwise you don't know if the last player had a card from the current suit, or played something else.
+7) The text in the score card and the background are both white

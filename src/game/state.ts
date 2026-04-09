@@ -1,27 +1,45 @@
 import { Card, GameState, Player, Suit } from '@/shared/types'
-import { buildDeck, deal, shuffle } from './deck'
+import { buildLimitedDeck, deal, shuffle } from './deck'
+
+/**
+ * Trump follows a fixed cycle: Spades, Hearts, Diamonds, Clubs, No Trump, repeat.
+ * Round number is 1-indexed.
+ */
+const TRUMP_CYCLE: (Suit | null)[] = ['spades', 'hearts', 'diamonds', 'clubs', null]
+function trumpForRound(round: number): Suit | null {
+  return TRUMP_CYCLE[(round - 1) % TRUMP_CYCLE.length]
+}
 import { allBidsPlaced, validateBid } from './bidding'
 import { isValidPlay, newTrick, removeCardFromHand, resolveTrick, trickComplete } from './tricks'
 import { calculateRoundScores } from './scoring'
 
 /**
  * Number of cards dealt per round follows the Judgement pattern:
- * 1, 2, ... max, ... 2, 1  (pyramid), where max = floor(52 / playerCount)
+ * maxCards, maxCards-1, ... 1, ... maxCards-1, maxCards
+ * where maxCards defaults to floor(52 / playerCount)
  */
-export function buildRoundSequence(playerCount: number): number[] {
-  const max = Math.floor(52 / playerCount)
-  const up = Array.from({ length: max }, (_, i) => i + 1)
-  const down = [...up].reverse().slice(1)
-  return [...up, ...down]
+export function buildRoundSequence(playerCount: number, maxCards?: number): number[] {
+  const limit = Math.floor(52 / playerCount)
+  const max = maxCards ? Math.min(maxCards, limit) : limit
+  const down = Array.from({ length: max }, (_, i) => max - i)   // max, max-1, ..., 1
+  const up = [...down].reverse().slice(1)                        // 2, 3, ..., max
+  return [...down, ...up]
 }
 
-export function createInitialGameState(players: Player[], dealerIndex: number): GameState {
-  const roundSequence = buildRoundSequence(players.length)
-  const cardsThisRound = roundSequence[0]
+export function createInitialGameState(players: Player[], dealerIndex: number, maxCards?: number): GameState {
+  const limit = Math.floor(52 / players.length)
+  const effectiveMax = maxCards ? Math.min(maxCards, limit) : limit
 
-  const deck = shuffle(buildDeck())
-  const [hands, remaining] = deal(deck, players.length, cardsThisRound)
-  const trump: Suit | null = remaining[0]?.suit ?? null
+  const roundSequence = buildRoundSequence(players.length, maxCards)
+  const cardsThisRound = roundSequence[0] // first round uses all cards
+
+  // Build the fixed game deck: playerCount × maxCardsPerRound cards, highest ranks
+  const gameDeckSize = players.length * effectiveMax
+  const gameDeck = buildLimitedDeck(gameDeckSize)
+
+  // First round uses the entire game deck (shuffled)
+  const [hands] = deal(shuffle([...gameDeck]), players.length, cardsThisRound)
+  const trump = trumpForRound(1)
 
   const initialPlayers = players.map((p, i) => ({
     ...p,
@@ -37,10 +55,13 @@ export function createInitialGameState(players: Player[], dealerIndex: number): 
     round: 1,
     maxRounds: roundSequence.length,
     cardsThisRound,
+    maxCardsPerRound: effectiveMax,
+    gameDeck,
     trump,
     phase: 'bidding',
     currentPlayerIndex: firstBidderIndex,
     currentTrick: newTrick(),
+    lastCompletedTrick: null,
     completedTricks: [],
     scores: [],
     dealerIndex,
@@ -104,16 +125,17 @@ export function applyPlayCard(state: GameState, playerId: string, card: Card): G
       const scores = [...state.scores, roundScores]
 
       if (state.round >= state.maxRounds) {
-        return { ...state, players, phase: 'gameOver', completedTricks, currentTrick: newTrick(), scores }
+        return { ...state, players, phase: 'gameOver', completedTricks, currentTrick: newTrick(), lastCompletedTrick: finishedTrick, scores }
       }
 
-      return { ...state, players, phase: 'roundEnd', completedTricks, currentTrick: newTrick(), scores }
+      return { ...state, players, phase: 'roundEnd', completedTricks, currentTrick: newTrick(), lastCompletedTrick: finishedTrick, scores }
     }
 
     return {
       ...state,
       players,
       currentTrick: newTrick(),
+      lastCompletedTrick: finishedTrick,
       completedTricks,
       currentPlayerIndex: winnerIndex,
     }
@@ -124,15 +146,18 @@ export function applyPlayCard(state: GameState, playerId: string, card: Card): G
 }
 
 export function advanceRound(state: GameState): GameState {
-  const roundSequence = buildRoundSequence(state.players.length)
+  const roundSequence = buildRoundSequence(state.players.length, state.maxCardsPerRound)
   const nextRound = state.round + 1
   const cardsThisRound = roundSequence[nextRound - 1]
   const nextDealerIndex = (state.dealerIndex + 1) % state.players.length
   const firstBidderIndex = (nextDealerIndex + 1) % state.players.length
 
-  const deck = shuffle(buildDeck())
-  const [hands, remaining] = deal(deck, state.players.length, cardsThisRound)
-  const trump: import('@/shared/types').Suit | null = remaining[0]?.suit ?? null
+  // Shuffle the fixed game deck, then take only the cards needed this round
+  const cardsNeeded = state.players.length * cardsThisRound
+  const shuffled = shuffle([...state.gameDeck])
+  const roundCards = shuffled.slice(0, cardsNeeded)
+  const [hands] = deal(roundCards, state.players.length, cardsThisRound)
+  const trump = trumpForRound(nextRound)
 
   const players = state.players.map((p, i) => ({
     ...p,
@@ -150,6 +175,7 @@ export function advanceRound(state: GameState): GameState {
     phase: 'bidding',
     currentPlayerIndex: firstBidderIndex,
     currentTrick: newTrick(),
+    lastCompletedTrick: null,
     completedTricks: [],
     dealerIndex: nextDealerIndex,
   }

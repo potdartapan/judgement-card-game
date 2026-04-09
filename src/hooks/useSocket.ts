@@ -26,3 +26,13 @@ export function useSocket(): AppSocket {
 
   return ref.current
 }
+
+/** Persistent player ID that survives page refresh */
+export function getPlayerId(): string {
+  let id = sessionStorage.getItem('playerId')
+  if (!id) {
+    id = crypto.randomUUID()
+    sessionStorage.setItem('playerId', id)
+  }
+  return id
+}
